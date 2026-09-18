@@ -1,0 +1,124 @@
+# PaySecure Gateway - Multi-Region Health Check Configuration
+
+# Primary Region: Mumbai (ap-south-1)
+
+# DR Region: Hyderabad (ap-south-2)
+
+health_checks:
+
+primary_api:
+name: paysecure-mumbai-api-health
+region: ap-south-1
+protocol: HTTPS
+hostname: api-mum.paysecure.example
+path: /health
+port: 443
+interval_seconds: 10
+timeout_seconds: 5
+failure_threshold: 3
+expected_status_code: 200
+enabled: true
+
+primary_readiness:
+name: paysecure-mumbai-readiness
+region: ap-south-1
+protocol: HTTPS
+hostname: api-mum.paysecure.example
+path: /ready
+port: 443
+interval_seconds: 10
+timeout_seconds: 5
+failure_threshold: 3
+expected_status_code: 200
+enabled: true
+
+secondary_api:
+name: paysecure-hyderabad-api-health
+region: ap-south-2
+protocol: HTTPS
+hostname: api-hyd.paysecure.example
+path: /health
+port: 443
+interval_seconds: 10
+timeout_seconds: 5
+failure_threshold: 3
+expected_status_code: 200
+enabled: true
+
+secondary_readiness:
+name: paysecure-hyderabad-readiness
+region: ap-south-2
+protocol: HTTPS
+hostname: api-hyd.paysecure.example
+path: /ready
+port: 443
+interval_seconds: 10
+timeout_seconds: 5
+failure_threshold: 3
+expected_status_code: 200
+enabled: true
+
+monitoring:
+replication_lag:
+warning_threshold_seconds: 30
+critical_threshold_seconds: 60
+
+api:
+error_rate_warning_percent: 2
+error_rate_critical_percent: 5
+
+latency:
+p99_warning_ms: 150
+p99_critical_ms: 180
+
+availability:
+warning_percent: 99.95
+critical_percent: 99.90
+
+failover:
+primary_region: ap-south-1
+secondary_region: ap-south-2
+
+mode: active-passive
+
+require_incident_commander_authorization: true
+
+preconditions:
+- primary_failure_confirmed
+- secondary_application_healthy
+- secondary_database_available
+- replication_status_validated
+- kafka_status_validated
+- security_controls_validated
+- payment_smoke_test_passed
+
+validation_after_failover:
+- dns_resolution
+- tls_handshake
+- application_health
+- database_connectivity
+- idempotency_check
+- kafka_event_processing
+- payment_smoke_test
+
+alerts:
+
+primary_failure:
+severity: critical
+condition: "primary_api_health_failed >= 3 consecutive checks"
+
+replication_lag:
+severity: high
+condition: "replication_lag_seconds >= 30"
+
+replication_critical:
+severity: critical
+condition: "replication_lag_seconds >= 60"
+
+secondary_failure:
+severity: critical
+condition: "secondary_api_health_failed >= 3 consecutive checks"
+
+payment_validation_failure:
+severity: critical
+condition: "payment_smoke_test_failed == true"
