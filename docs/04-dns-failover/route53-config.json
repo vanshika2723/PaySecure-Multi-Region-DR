@@ -1,92 +1,79 @@
 {
-"hosted_zone": {
-"domain": "paysecure.example",
-"record_name": "api.paysecure.example",
-"record_type": "A"
-},
-
-"routing_policy": {
-"type": "FAILOVER",
-"primary_region": "ap-south-1",
-"secondary_region": "ap-south-2"
-},
-
-"records": {
-"primary": {
-"record_name": "api.paysecure.example",
-"record_type": "A",
-"set_identifier": "mumbai-primary",
-"failover_role": "PRIMARY",
-"alias_target": {
-"region": "ap-south-1",
-"resource": "Mumbai Application Load Balancer"
-},
-"health_check": "paysecure-mumbai-api-health",
-"evaluate_target_health": true
-},
-
-```
-"secondary": {
-  "record_name": "api.paysecure.example",
-  "record_type": "A",
-  "set_identifier": "hyderabad-secondary",
-  "failover_role": "SECONDARY",
-  "alias_target": {
-    "region": "ap-south-2",
-    "resource": "Hyderabad Application Load Balancer"
+  "hosted_zone": {
+    "domain": "paysecure.example",
+    "record_name": "api.paysecure.example",
+    "record_type": "A"
   },
-  "health_check": "paysecure-hyderabad-api-health",
-  "evaluate_target_health": true
-}
-```
-
-},
-
-"health_checks": {
-"primary": {
-"name": "paysecure-mumbai-api-health",
-"protocol": "HTTPS",
-"port": 443,
-"path": "/health",
-"interval_seconds": 10,
-"timeout_seconds": 5,
-"failure_threshold": 3,
-"expected_status_code": 200
-},
-
-```
-"secondary": {
-  "name": "paysecure-hyderabad-api-health",
-  "protocol": "HTTPS",
-  "port": 443,
-  "path": "/health",
-  "interval_seconds": 10,
-  "timeout_seconds": 5,
-  "failure_threshold": 3,
-  "expected_status_code": 200
-}
-```
-
-},
-
-"failover_controls": {
-"automatic_dns_failover": true,
-"incident_commander_authorization": true,
-"require_dr_readiness_validation": true,
-"require_payment_smoke_test": true,
-"require_replication_validation": true
-},
-
-"failback": {
-"automatic": false,
-"manual_authorization_required": true,
-"requirements": [
-"Mumbai infrastructure healthy",
-"Application health validated",
-"Database synchronization completed",
-"Kafka synchronization validated",
-"Security controls validated",
-"Payment smoke test passed"
-]
-}
+  "routing_policy": {
+    "type": "FAILOVER",
+    "primary_region": "ap-south-1",
+    "secondary_region": "ap-south-2"
+  },
+  "records": {
+    "primary": {
+      "record_name": "api.paysecure.example",
+      "record_type": "A",
+      "set_identifier": "mumbai-primary",
+      "failover_role": "PRIMARY",
+      "alias_target": {
+        "region": "ap-south-1",
+        "resource": "Mumbai Application Load Balancer"
+      },
+      "health_check": "paysecure-mumbai-api-health",
+      "evaluate_target_health": true
+    },
+    "secondary": {
+      "record_name": "api.paysecure.example",
+      "record_type": "A",
+      "set_identifier": "hyderabad-secondary",
+      "failover_role": "SECONDARY",
+      "alias_target": {
+        "region": "ap-south-2",
+        "resource": "Hyderabad Application Load Balancer"
+      },
+      "health_check": "paysecure-hyderabad-api-health",
+      "evaluate_target_health": true
+    }
+  },
+  "health_checks": {
+    "primary": {
+      "name": "paysecure-mumbai-api-health",
+      "protocol": "HTTPS",
+      "port": 443,
+      "path": "/health",
+      "interval_seconds": 10,
+      "timeout_seconds": 5,
+      "failure_threshold": 3,
+      "expected_status_code": 200
+    },
+    "secondary": {
+      "name": "paysecure-hyderabad-api-health",
+      "protocol": "HTTPS",
+      "port": 443,
+      "path": "/health",
+      "interval_seconds": 10,
+      "timeout_seconds": 5,
+      "failure_threshold": 3,
+      "expected_status_code": 200
+    }
+  },
+  "failover_controls": {
+    "automatic_dns_failover": true,
+    "incident_commander_authorization": true,
+    "require_dr_readiness_validation": true,
+    "require_payment_smoke_test": true,
+    "require_replication_validation": true
+  },
+  "failback": {
+    "automatic": false,
+    "manual_authorization_required": true,
+    "requirements": [
+      "Mumbai infrastructure healthy",
+      "Application health validated",
+      "Database synchronization completed",
+      "Kafka synchronization validated",
+      "Security controls validated",
+      "Payment smoke test passed"
+    ]
+  }
 }
