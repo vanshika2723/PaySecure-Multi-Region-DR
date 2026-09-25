@@ -1,0 +1,124 @@
+
+project: PaySecure-Multi-Region-DR
+environment: production
+
+alarm_defaults:
+  evaluation_periods: 2
+  datapoints_to_alarm: 2
+  treat_missing_data: breaching
+
+alarms:
+
+  - name: AuroraGlobalDBReplicationLag-P1
+    service: Aurora
+    metric: AuroraGlobalDBReplicationLag
+    namespace: AWS/RDS
+    threshold: 500
+    comparison: GreaterThanThreshold
+    period_seconds: 60
+    evaluation_periods: 2
+    severity: P1
+    action: page-oncall-and-initiate-dr-assessment
+
+  - name: DynamoDBGlobalTableReplicationLag-P1
+    service: DynamoDB
+    metric: ReplicationLatency
+    namespace: AWS/DynamoDB
+    threshold: 1000
+    comparison: GreaterThanThreshold
+    period_seconds: 60
+    evaluation_periods: 3
+    severity: P1
+    action: page-oncall-and-initiate-dr-assessment
+
+  - name: ElastiCacheGlobalDatastoreLag-P2
+    service: ElastiCache
+    metric: GlobalDatastoreReplicationLag
+    namespace: AWS/ElastiCache
+    threshold: 2000
+    comparison: GreaterThanThreshold
+    period_seconds: 60
+    evaluation_periods: 3
+    severity: P2
+    action: notify-platform-team
+
+  - name: MSKReplicatorLag-P2
+    service: MSK
+    metric: ReplicationLagMessages
+    namespace: Custom/PaySecure/MSK
+    threshold: 10000
+    comparison: GreaterThanThreshold
+    period_seconds: 60
+    evaluation_periods: 5
+    severity: P2
+    action: notify-platform-team
+
+  - name: Route53HealthCheckFailure-P1
+    service: Route53
+    metric: HealthCheckStatus
+    namespace: AWS/Route53
+    threshold: 1
+    comparison: LessThanThreshold
+    period_seconds: 30
+    evaluation_periods: 1
+    severity: P1
+    action: page-oncall-and-initiate-failover-assessment
+
+  - name: PaymentAPISuccessRate-P1
+    service: PaymentAPI
+    metric: PaymentSuccessRate
+    namespace: Custom/PaySecure/Payments
+    threshold: 99.5
+    comparison: LessThanThreshold
+    period_seconds: 60
+    evaluation_periods: 2
+    severity: P1
+    action: page-oncall
+
+  - name: TransactionP99Latency-P2
+    service: PaymentAPI
+    metric: TransactionP99Latency
+    namespace: Custom/PaySecure/Payments
+    threshold: 300
+    comparison: GreaterThanThreshold
+    period_seconds: 60
+    evaluation_periods: 5
+    severity: P2
+    action: notify-platform-team
+
+  - name: EKSUnreadyNodes-P2
+    service: EKS
+    metric: UnreadyNodes
+    namespace: Custom/PaySecure/EKS
+    threshold: 2
+    comparison: GreaterThanThreshold
+    period_seconds: 60
+    evaluation_periods: 3
+    severity: P2
+    action: notify-platform-team
+
+  - name: KMSUsageAnomaly-P1
+    service: KMS
+    metric: KeyUsageHourlyRatio
+    namespace: Custom/PaySecure/Security
+    threshold: 3
+    comparison: GreaterThanThreshold
+    period_seconds: 3600
+    evaluation_periods: 1
+    severity: P1
+    action: page-security-and-platform-oncall
+
+  - name: DRRegionCompositeHealth-P1
+    service: DR
+    metric: CompositeHealth
+    namespace: Custom/PaySecure/DR
+    threshold: 1
+    comparison: LessThanThreshold
+    period_seconds: 60
+    evaluation_periods: 1
+    severity: P1
+    action: page-oncall-and-block-failover
+
+
+
+

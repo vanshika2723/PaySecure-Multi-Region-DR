@@ -1,0 +1,117 @@
+groups:
+
+  - name: paysecure-dr
+    interval: 30s
+
+    rules:
+
+      - alert: PaymentAPISuccessRateCritical
+        expr: |
+          (
+            sum(rate(payment_api_requests_total{status=~"2.."}[2m]))
+            /
+            sum(rate(payment_api_requests_total[2m]))
+          ) * 100 < 99.5
+        for: 2m
+        labels:
+          severity: P1
+          service: payment-api
+        annotations:
+          summary: "Payment API success rate below 99.5%"
+          description: "Payment API success rate has remained below the 99.5% threshold for 2 minutes."
+
+      - alert: TransactionP99LatencyHigh
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(transaction_latency_seconds_bucket[5m])) by (le)
+          ) * 1000 > 300
+        for: 5m
+        labels:
+          severity: P2
+          service: payment-api
+        annotations:
+          summary: "Transaction P99 latency above 300ms"
+          description: "Transaction P99 latency has exceeded 300ms for 5 minutes."
+
+      - alert: EKSUnreadyNodes
+        expr: |
+          kube_node_status_condition{
+            condition="Ready",
+            status="false"
+          } > 2
+        for: 3m
+        labels:
+          severity: P2
+          service: eks
+        annotations:
+          summary: "More than two EKS nodes are unready"
+          description: "EKS has more than two unready nodes for 3 minutes."
+
+      - alert: AuroraReplicationLagCritical
+        expr: |
+          aws_rds_aurora_global_db_replication_lag > 500
+        for: 2m
+        labels:
+          severity: P1
+          service: aurora
+        annotations:
+          summary: "Aurora Global Database replication lag above 500ms"
+          description: "Aurora replication lag exceeded 500ms for two consecutive checks."
+
+      - alert: DynamoDBReplicationLagCritical
+        expr: |
+          aws_dynamodb_replication_latency > 1000
+        for: 3m
+        labels:
+          severity: P1
+          service: dynamodb
+        annotations:
+          summary: "DynamoDB replication latency above 1000ms"
+          description: "DynamoDB Global Table replication latency exceeded 1000ms."
+
+      - alert: RedisReplicationLagHigh
+        expr: |
+          redis_global_datastore_replication_lag_seconds * 1000 > 2000
+        for: 3m
+        labels:
+          severity: P2
+          service: redis
+        annotations:
+          summary: "Redis replication lag above 2000ms"
+          description: "Redis Global Datastore replication lag exceeded 2000ms."
+
+      - alert: MSKReplicatorLagHigh
+        expr: |
+          msk_replicator_lag_messages > 10000
+        for: 5m
+        labels:
+          severity: P2
+          service: msk
+        annotations:
+          summary: "MSK replication lag above 10000 messages"
+          description: "MSK Replicator lag exceeded 10000 messages for 5 minutes."
+
+      - alert: KMSUsageAnomaly
+        expr: |
+          kms_key_usage_hourly
+          /
+          kms_key_usage_hourly_baseline > 3
+        for: 1h
+        labels:
+          severity: P1
+          service: security
+        annotations:
+          summary: "KMS key usage exceeds 3x baseline"
+          description: "KMS usage has exceeded three times the normal hourly baseline."
+
+      - alert: DRRegionUnhealthy
+        expr: |
+          paysecure_dr_composite_health < 1
+        for: 1m
+        labels:
+          severity: P1
+          service: dr
+        annotations:
+          summary: "DR region composite health check failed"
+          description: "One or more critical DR components are unhealthy."

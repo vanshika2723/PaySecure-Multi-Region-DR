@@ -1,0 +1,75 @@
+{
+  "dashboard": {
+    "title": "PaySecure Multi-Region DR",
+    "description": "Production DR health and replication monitoring dashboard",
+    "tags": [
+      "paysecure",
+      "dr",
+      "aws",
+      "payments"
+    ],
+    "timezone": "browser",
+    "panels": [
+      {
+        "title": "Payment API Success Rate",
+        "type": "timeseries",
+        "unit": "percent",
+        "target": "payment_api_success_rate"
+      },
+      {
+        "title": "Transaction P99 Latency",
+        "type": "timeseries",
+        "unit": "ms",
+        "target": "transaction_p99_latency"
+      },
+      {
+        "title": "Aurora Replication Lag",
+        "type": "timeseries",
+        "unit": "ms",
+        "target": "aurora_global_db_replication_lag"
+      },
+      {
+        "title": "DynamoDB Replication Latency",
+        "type": "timeseries",
+        "unit": "ms",
+        "target": "dynamodb_replication_latency"
+      },
+      {
+        "title": "Redis Global Datastore Lag",
+        "type": "timeseries",
+        "unit": "ms",
+        "target": "redis_global_datastore_replication_lag"
+      },
+      {
+        "title": "MSK Replicator Lag",
+        "type": "timeseries",
+        "unit": "messages",
+        "target": "msk_replicator_lag_messages"
+      },
+      {
+        "title": "EKS Unready Nodes",
+        "type": "stat",
+        "unit": "nodes",
+        "target": "eks_unready_nodes"
+      },
+      {
+        "title": "DR Composite Health",
+        "type": "stat",
+        "unit": "bool",
+        "target": "paysecure_dr_composite_health"
+      },
+      {
+        "title": "KMS Usage Ratio",
+        "type": "timeseries",
+        "unit": "ratio",
+        "target": "kms_key_usage_ratio"
+      },
+      {
+        "title": "Route 53 Health",
+        "type": "stat",
+        "unit": "bool",
+        "target": "route53_health_status"
+      }
+    ]
+  }
+}
