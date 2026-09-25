@@ -1,234 +1,302 @@
+
 locals {
-common_tags = {
-Project     = var.project_name
-Environment = var.environment
-ManagedBy   = "Terraform"
-DRStrategy  = "Hot-Standby"
-Compliance  = "PCI-DSS"
+  common_tags = {
+    Project     = var.project_name
+    ManagedBy   = "Terraform"
+    DRProject   = "PaySecure-Multi-Region"
+    Environment = var.environment
+  }
 }
-}
 
-# -------------------------------------------------------------------
-
-# Primary Region - Mumbai
-
-# -------------------------------------------------------------------
+# ============================================================
+# PRIMARY NETWORKING - MUMBAI
+# ============================================================
 
 module "primary_networking" {
-source = "./modules/networking"
+  source = "./modules/networking"
 
-providers = {
-aws = aws.primary
+  providers = {
+    aws = aws.primary
+  }
+
+  project_name      = var.project_name
+  region            = var.primary_region
+  environment       = "primary"
+  vpc_cidr          = var.vpc_cidr_primary
+  availability_zones = var.primary_availability_zones
+  common_tags       = local.common_tags
 }
 
-project_name        = var.project_name
-region              = var.primary_region
-vpc_cidr            = var.vpc_cidr_primary
-availability_zones  = var.availability_zones_primary
-environment         = "primary"
-common_tags         = local.common_tags
-}
-
-# -------------------------------------------------------------------
-
-# DR Region - Hyderabad
-
-# -------------------------------------------------------------------
+# ============================================================
+# DR NETWORKING - HYDERABAD
+# ============================================================
 
 module "dr_networking" {
-source = "./modules/networking"
+  source = "./modules/networking"
 
-providers = {
-aws = aws.dr
+  providers = {
+    aws = aws.dr
+  }
+
+  project_name      = var.project_name
+  region            = var.dr_region
+  environment       = "dr"
+  vpc_cidr          = var.vpc_cidr_dr
+  availability_zones = var.dr_availability_zones
+  common_tags       = local.common_tags
 }
 
-project_name        = var.project_name
-region              = var.dr_region
-vpc_cidr            = var.vpc_cidr_dr
-availability_zones  = var.availability_zones_dr
-environment         = "dr"
-common_tags         = local.common_tags
-}
-
-# -------------------------------------------------------------------
-
-# EKS - Primary
-
-# -------------------------------------------------------------------
+# ============================================================
+# PRIMARY EKS
+# ============================================================
 
 module "primary_eks" {
-count  = var.enable_eks ? 1 : 0
-source = "./modules/eks"
+  count  = var.enable_eks ? 1 : 0
+  source = "./modules/eks"
 
-providers = {
-aws = aws.primary
+  providers = {
+    aws = aws.primary
+  }
+
+  cluster_name        = var.primary_eks_name
+  region              = var.primary_region
+  environment         = "primary"
+  subnet_ids          = module.primary_networking.private_subnet_ids
+  node_instance_type  = var.eks_node_instance_type
+  desired_nodes       = var.primary_eks_desired_nodes
+  min_nodes           = 3
+  max_nodes           = 12
+  common_tags         = local.common_tags
 }
 
-cluster_name       = var.eks_cluster_name_primary
-region             = var.primary_region
-environment        = "primary"
-node_instance_type = var.eks_node_instance_type
-desired_nodes      = var.eks_desired_nodes_primary
-
-vpc_id     = module.primary_networking.vpc_id
-subnet_ids = module.primary_networking.private_subnet_ids
-
-common_tags = local.common_tags
-}
-
-# -------------------------------------------------------------------
-
-# EKS - DR
-
-# -------------------------------------------------------------------
+# ============================================================
+# DR EKS
+# ============================================================
 
 module "dr_eks" {
-count  = var.enable_eks ? 1 : 0
-source = "./modules/eks"
+  count  = var.enable_eks ? 1 : 0
+  source = "./modules/eks"
 
-providers = {
-aws = aws.dr
+  providers = {
+    aws = aws.dr
+  }
+
+  cluster_name        = var.dr_eks_name
+  region              = var.dr_region
+  environment         = "dr"
+  subnet_ids          = module.dr_networking.private_subnet_ids
+  node_instance_type  = var.eks_node_instance_type
+  desired_nodes       = var.dr_eks_desired_nodes
+  min_nodes           = 3
+  max_nodes           = 12
+  common_tags         = local.common_tags
 }
 
-cluster_name       = var.eks_cluster_name_dr
-region             = var.dr_region
-environment        = "dr"
-node_instance_type = var.eks_node_instance_type
-desired_nodes      = var.eks_desired_nodes_dr
+# ============================================================
+# PRIMARY AURORA
+# ============================================================
 
-vpc_id     = module.dr_networking.vpc_id
-subnet_ids = module.dr_networking.private_subnet_ids
+module "primary_aurora" {
+  count  = var.enable_database ? 1 : 0
+  source = "./modules/aurora"
 
-common_tags = local.common_tags
+  providers = {
+    aws = aws.primary
+  }
+
+  cluster_identifier = "${var.project_name}-primary"
+  engine             = var.aurora_engine
+  database_name      = var.aurora_database_name
+  instance_class     = var.aurora_instance_class
+
+  master_username = var.aurora_master_username
+  master_password = var.aurora_master_password
+
+  subnet_ids = module.primary_networking.database_subnet_ids
+
+  # Security groups will be added during security-layer integration.
+  vpc_security_group_ids = []
+
+  common_tags = local.common_tags
 }
 
-# -------------------------------------------------------------------
+# ============================================================
+# DR AURORA
+# ============================================================
 
-# Aurora PostgreSQL
+module "dr_aurora" {
+  count  = var.enable_database ? 1 : 0
+  source = "./modules/aurora"
 
-# -------------------------------------------------------------------
+  providers = {
+    aws = aws.dr
+  }
 
-module "aurora" {
-count  = var.enable_database ? 1 : 0
-source = "./modules/aurora"
+  cluster_identifier = "${var.project_name}-dr"
+  engine             = var.aurora_engine
+  database_name      = var.aurora_database_name
+  instance_class     = var.aurora_instance_class
 
-providers = {
-aws.primary = aws.primary
-aws.dr      = aws.dr
+  master_username = var.aurora_master_username
+  master_password = var.aurora_master_password
+
+  subnet_ids = module.dr_networking.database_subnet_ids
+
+  vpc_security_group_ids = []
+
+  common_tags = local.common_tags
 }
 
-project_name        = var.project_name
-database_name       = var.aurora_database_name
-engine              = var.aurora_engine
-instance_class      = var.aurora_instance_class
-
-primary_region      = var.primary_region
-dr_region           = var.dr_region
-
-primary_vpc_id      = module.primary_networking.vpc_id
-dr_vpc_id           = module.dr_networking.vpc_id
-
-primary_subnet_ids  = module.primary_networking.database_subnet_ids
-dr_subnet_ids       = module.dr_networking.database_subnet_ids
-
-common_tags = local.common_tags
-}
-
-# -------------------------------------------------------------------
-
-# DynamoDB
-
-# -------------------------------------------------------------------
+# ============================================================
+# DYNAMODB GLOBAL TABLE
+# ============================================================
 
 module "dynamodb" {
-count  = var.enable_dynamodb ? 1 : 0
-source = "./modules/dynamodb"
+  count  = var.enable_dynamodb ? 1 : 0
+  source = "./modules/dynamodb"
 
-providers = {
-aws.primary = aws.primary
-aws.dr      = aws.dr
+  providers = {
+    aws = aws.primary
+  }
+
+  table_name      = var.dynamodb_table_name
+  replica_regions = [var.dr_region]
+
+  common_tags = local.common_tags
 }
 
-table_name      = var.dynamodb_table_name
-primary_region  = var.primary_region
-dr_region       = var.dr_region
+# ============================================================
+# PRIMARY REDIS
+# ============================================================
 
-common_tags = local.common_tags
+module "primary_redis" {
+  count  = var.enable_redis ? 1 : 0
+  source = "./modules/redis"
+
+  providers = {
+    aws = aws.primary
+  }
+
+  replication_group_id = "${var.project_name}-redis-primary"
+
+  subnet_ids = module.primary_networking.private_subnet_ids
+
+  security_group_ids = []
+
+  common_tags = local.common_tags
 }
 
-# -------------------------------------------------------------------
+# ============================================================
+# DR REDIS
+# ============================================================
 
-# Redis
+module "dr_redis" {
+  count  = var.enable_redis ? 1 : 0
+  source = "./modules/redis"
 
-# -------------------------------------------------------------------
+  providers = {
+    aws = aws.dr
+  }
 
-module "redis" {
-count  = var.enable_redis ? 1 : 0
-source = "./modules/redis"
+  replication_group_id = "${var.project_name}-redis-dr"
 
-providers = {
-aws.primary = aws.primary
-aws.dr      = aws.dr
+  subnet_ids = module.dr_networking.private_subnet_ids
+
+  security_group_ids = []
+
+  common_tags = local.common_tags
 }
 
-project_name = var.project_name
-node_type    = var.redis_node_type
+# ============================================================
+# PRIMARY MSK
+# ============================================================
 
-primary_region = var.primary_region
-dr_region      = var.dr_region
+module "primary_msk" {
+  count  = var.enable_msk ? 1 : 0
+  source = "./modules/msk"
 
-primary_vpc_id = module.primary_networking.vpc_id
-dr_vpc_id      = module.dr_networking.vpc_id
+  providers = {
+    aws = aws.primary
+  }
 
-common_tags = local.common_tags
+  cluster_name           = "${var.project_name}-msk-primary"
+  kafka_version          = var.msk_kafka_version
+  number_of_broker_nodes = 3
+
+  subnet_ids = module.primary_networking.private_subnet_ids
+
+  security_group_ids = []
+
+  kms_key_arn = var.msk_kms_key_arn
+
+  common_tags = local.common_tags
 }
 
-# -------------------------------------------------------------------
+# ============================================================
+# DR MSK
+# ============================================================
 
-# Amazon MSK
+module "dr_msk" {
+  count  = var.enable_msk ? 1 : 0
+  source = "./modules/msk"
 
-# -------------------------------------------------------------------
+  providers = {
+    aws = aws.dr
+  }
 
-module "msk" {
-count  = var.enable_msk ? 1 : 0
-source = "./modules/msk"
+  cluster_name           = "${var.project_name}-msk-dr"
+  kafka_version          = var.msk_kafka_version
+  number_of_broker_nodes = 3
 
-providers = {
-aws.primary = aws.primary
-aws.dr      = aws.dr
+  subnet_ids = module.dr_networking.private_subnet_ids
+
+  security_group_ids = []
+
+  kms_key_arn = var.msk_kms_key_arn
+
+  common_tags = local.common_tags
 }
 
-project_name = var.project_name
-kafka_version = var.msk_kafka_version
-
-primary_region = var.primary_region
-dr_region      = var.dr_region
-
-primary_vpc_id = module.primary_networking.vpc_id
-dr_vpc_id      = module.dr_networking.vpc_id
-
-primary_subnet_ids = module.primary_networking.private_subnet_ids
-dr_subnet_ids      = module.dr_networking.private_subnet_ids
-
-common_tags = local.common_tags
-}
-
-# -------------------------------------------------------------------
-
-# Route 53
-
-# -------------------------------------------------------------------
+# ============================================================
+# ROUTE 53
+# ============================================================
 
 module "route53" {
-count  = var.enable_route53 ? 1 : 0
-source = "./modules/route53"
+  count  = var.enable_route53 ? 1 : 0
+  source = "./modules/route53"
 
-providers = {
-aws = aws.primary
+  providers = {
+    aws = aws.primary
+  }
+
+  hosted_zone_id = var.route53_zone_id
+  zone_name      = var.route53_zone_name
+  record_name    = var.route53_record_name
+
+  primary_region = var.primary_region
+  dr_region      = var.dr_region
+
+  primary_endpoint = var.route53_primary_endpoint
+  dr_endpoint      = var.route53_dr_endpoint
+
+  primary_alias_zone_id = var.route53_primary_alias_zone_id
+  dr_alias_zone_id      = var.route53_dr_alias_zone_id
+
+  common_tags = local.common_tags
 }
+```
 
-project_name   = var.project_name
-hosted_zone_id = var.route53_zone_id
+### ⚠️ Abhi `terraform apply` mat karna
 
-common_tags = local.common_tags
-}
+Is file mein kuch variables abhi `variables.tf` mein nahi hain:
+
+```text
+aurora_master_username
+aurora_master_password
+msk_kms_key_arn
+route53_zone_name
+route53_primary_endpoint
+route53_dr_endpoint
+route53_primary_alias_zone_id
+route53_dr_alias_zone_id
+
