@@ -14,32 +14,45 @@
 
 ## 1. Executive Summary
 
-PaySecure Gateway is a mid-tier payment aggregator processing approximately **3.2 million transactions per day**, with a daily transaction value of approximately **₹500 crore** and around **45,000 merchants**.
+PaySecure Gateway is a mid-tier payment aggregator processing approximately **3.2 million transactions per day**, with approximately **₹500 crore daily transaction value** and around **45,000 merchants**.
 
-The existing platform operates primarily from a single AWS Mumbai region and currently provides approximately **99.92% uptime**. The objective of this project is to design a production-oriented multi-region Disaster Recovery architecture capable of meeting a target availability of **99.99%**, an **RPO below one minute**, and an **RTO below five minutes**.
+The existing platform operates primarily from a single AWS Mumbai region with approximately **99.92% availability**.
 
-The proposed architecture uses:
+This project designs a multi-region Disaster Recovery architecture targeting:
 
-* AWS Mumbai (`ap-south-1`) as the primary region
-* AWS Hyderabad (`ap-south-2`) as the disaster recovery region
-* Hot-standby / active-passive application architecture
-* Amazon EKS for containerized workloads
+* **99.99% availability**
+* **RPO < 1 minute**
+* **RTO < 5 minutes**
+* Indian data residency
+* Controlled regional failover
+* Continuous replication of critical data
+* Repeatable DR validation and recovery procedures
+
+### Proposed Architecture
+
+* AWS Mumbai (`ap-south-1`) — Primary
+* AWS Hyderabad (`ap-south-2`) — DR / Hot Standby
+* Amazon EKS
 * Aurora PostgreSQL Global Database
 * DynamoDB Global Tables
 * ElastiCache Redis Global Datastore
 * Amazon MSK with cross-region replication
 * Amazon S3 Cross-Region Replication
-* Amazon Route 53 health checks and failover routing
-* AWS KMS, WAF and Shield security controls
-* CloudWatch, Prometheus, Grafana and PagerDuty for monitoring and incident response
-* Terraform-based infrastructure management
-* Structured disaster recovery runbooks and annual DR drills
+* Amazon Route 53 health checks and failover
+* AWS KMS
+* AWS WAF and Shield
+* CloudWatch
+* Prometheus / Grafana
+* Terraform
+* Kubernetes manifests
+* DR health-check and drill scripts
+* 12 operational DR runbooks
 
 ---
 
-## 2. Business Context
+# 2. Business Context
 
-### Current Environment
+## Current Environment
 
 | Metric                              | Current State |
 | ----------------------------------- | ------------: |
@@ -54,7 +67,7 @@ The proposed architecture uses:
 | Platform / Infrastructure Engineers |             8 |
 | Current Infrastructure Spend        | ₹8 crore/year |
 
-### Target DR Objectives
+## DR Objectives
 
 | Objective      |                 Target |
 | -------------- | ---------------------: |
@@ -63,128 +76,132 @@ The proposed architecture uses:
 | RTO            |            < 5 minutes |
 | DR Region      |          AWS Hyderabad |
 | Data Residency |                  India |
-| Failover       | Automated / controlled |
+| Failover       | Automated / Controlled |
 | DR Validation  |     Quarterly + Annual |
 
-The target of 99.99% availability corresponds to approximately **52.6 minutes of allowable downtime per year**.
+A 99.99% availability target corresponds to approximately **52.6 minutes of allowable downtime per year**.
 
 ---
 
-## 3. Architecture Decision
+# 3. Architecture Decision
 
-The selected design is a **Hot Standby / Active-Passive multi-region architecture**.
+The selected DR model is:
 
-### Primary Region
+## Hot Standby / Active-Passive Multi-Region
 
-**Mumbai — `ap-south-1`**
+### Mumbai — Primary
 
-The Mumbai region handles normal production traffic and acts as the primary writer/processing region.
+`ap-south-1` handles normal production traffic and acts as the primary processing region.
 
-### DR Region
+### Hyderabad — DR / Hot Standby
 
-**Hyderabad — `ap-south-2`**
+`ap-south-2` maintains synchronized infrastructure and replicated data and is prepared to accept production traffic during a declared disaster.
 
-The Hyderabad environment remains continuously synchronized and ready to accept production traffic during a regional failure or other declared disaster.
-
-### Failover Flow
+## Failover Flow
 
 ```text
                     Internet / Merchants
-                           |
-                           v
-                 Amazon Route 53
-                  Health Checks
-                           |
-             +-------------+-------------+
-             |                           |
-             v                           v
-       Mumbai Region              Hyderabad Region
-       ap-south-1                 ap-south-2
-       PRIMARY                    DR / HOT STANDBY
-             |                           |
-             v                           v
-          AWS EKS                    AWS EKS
-             |                           |
-             +-------------+-------------+
-                           |
+                            |
+                            v
+                     Amazon Route 53
+                      Health Checks
+                            |
+                +-----------+-----------+
+                |                       |
+                v                       v
+          Mumbai Region           Hyderabad Region
+          ap-south-1              ap-south-2
+          PRIMARY                 DR / HOT STANDBY
+                |                       |
+                v                       v
+             AWS EKS                 AWS EKS
+                |                       |
+                +-----------+-----------+
+                            |
                     Data Replication
-                           |
-       +-------------------+-------------------+
-       |                   |                   |
-       v                   v                   v
- Aurora Global DB    DynamoDB Global      Redis Global
-                     Tables               Datastore
-       |
-       +-------------------+
-       |
-       v
-       Amazon MSK
-       Cross-Region Replication
+                            |
+        +-------------------+-------------------+
+        |                   |                   |
+        v                   v                   v
+  Aurora Global       DynamoDB Global      Redis Global
+     Database              Tables            Datastore
+        |
+        v
+      Amazon MSK
+ Cross-Region Replication
 ```
 
 ---
 
-## 4. Core AWS Services
+# 4. Core AWS Services
 
-| Layer             | Technology                         | DR Strategy                      |
-| ----------------- | ---------------------------------- | -------------------------------- |
-| DNS               | Route 53                           | Health checks + failover routing |
-| Compute           | Amazon EKS                         | Hot standby                      |
-| Relational DB     | Aurora PostgreSQL Global Database  | Cross-region replication         |
-| NoSQL             | DynamoDB Global Tables             | Multi-region replication         |
-| Cache             | ElastiCache Redis Global Datastore | Cross-region replication         |
-| Messaging         | Amazon MSK                         | Cross-region replication         |
-| Object Storage    | Amazon S3                          | Cross-Region Replication         |
-| Security          | KMS, WAF, Shield                   | Multi-region security controls   |
-| Monitoring        | CloudWatch                         | Cross-region monitoring          |
-| Metrics           | Prometheus / Grafana               | Centralized observability        |
-| Incident Response | PagerDuty                          | P1/P2 alerting                   |
-| Infrastructure    | Terraform                          | Infrastructure consistency       |
-
----
-
-## 5. Disaster Recovery Objectives
-
-The architecture is designed around the following recovery objectives:
-
-### RPO — Recovery Point Objective
-
-**Less than 1 minute**
-
-Payment transaction data and supporting state should be replicated continuously so that a regional failure results in minimal data loss.
-
-### RTO — Recovery Time Objective
-
-**Less than 5 minutes**
-
-The failover process is designed to detect a regional failure, validate the DR environment, redirect traffic and restore payment processing within the target recovery window.
-
-### Availability
-
-**99.99% target**
-
-The multi-region architecture reduces dependency on a single AWS region and provides a controlled recovery path for regional failures.
+| Layer          | Technology             | DR Strategy                        |
+| -------------- | ---------------------- | ---------------------------------- |
+| DNS            | Route 53               | Health checks + failover           |
+| Compute        | Amazon EKS             | Hot standby                        |
+| Relational DB  | Aurora PostgreSQL      | Cross-region replication           |
+| NoSQL          | DynamoDB Global Tables | Multi-region replication           |
+| Cache          | ElastiCache Redis      | Cross-region replication           |
+| Messaging      | Amazon MSK             | Cross-region replication           |
+| Object Storage | Amazon S3              | Cross-Region Replication           |
+| Encryption     | AWS KMS                | Regional / replicated key strategy |
+| Edge Security  | WAF / Shield           | Multi-region controls              |
+| Monitoring     | CloudWatch             | Infrastructure monitoring          |
+| Metrics        | Prometheus / Grafana   | Application observability          |
+| Infrastructure | Terraform              | Infrastructure consistency         |
+| Orchestration  | Kubernetes             | Regional application deployment    |
 
 ---
 
-## 6. Data Replication Strategy
+# 5. Recovery Objectives
 
-### Aurora PostgreSQL
+## RPO — Recovery Point Objective
 
-Aurora PostgreSQL Global Database is used for cross-region relational database replication.
+**Target: < 1 minute**
 
-Key considerations:
+Critical payment data and supporting state are designed for continuous or near-continuous replication so that regional failure minimizes potential data loss.
 
-* Continuous replication from Mumbai to Hyderabad
-* Replication lag monitoring
+## RTO — Recovery Time Objective
+
+**Target: < 5 minutes**
+
+The recovery workflow is designed around:
+
+1. Failure detection
+2. Incident declaration
+3. DR readiness validation
+4. Database / application promotion
+5. DNS traffic redirection
+6. Application health validation
+7. Transaction verification
+
+## Availability
+
+**Target: 99.99%**
+
+The multi-region design reduces dependency on a single AWS region and provides a controlled recovery path for regional failures.
+
+---
+
+# 6. Data Replication Strategy
+
+## Aurora PostgreSQL
+
+Aurora PostgreSQL Global Database is used as the relational database replication strategy.
+
+Controls include:
+
+* Continuous cross-region replication
+* Replication-lag monitoring
 * Controlled writer promotion
 * Point-in-time recovery
 * Post-failover validation
 * Split-brain prevention
+* Transaction reconciliation
 
-### DynamoDB
+## DynamoDB
 
-DynamoDB Global Tables provide multi-region data replication.
+DynamoDB Global Tables provide multi-region replication.
 
 Monitoring includes:
 
@@ -194,17 +211,17 @@ Monitoring includes:
 * Region health
 * Data consistency validation
 
-### ElastiCache Redis
+## ElastiCache Redis
 
-Redis Global Datastore provides cross-region replication for cache state.
+Redis Global Datastore is used for cross-region cache replication.
 
-Cache data is treated differently from system-of-record payment data. Cache recovery must not compromise transaction correctness.
+Redis is treated as a cache rather than the system of record. Recovery must therefore preserve payment transaction correctness even if cache state requires reconstruction.
 
-### Amazon MSK
+## Amazon MSK
 
-Kafka workloads use cross-region replication to maintain critical event streams.
+Kafka workloads use cross-region replication.
 
-Important controls include:
+Important controls:
 
 * Consumer lag monitoring
 * Replication lag monitoring
@@ -213,17 +230,17 @@ Important controls include:
 * Offset reconciliation
 * Duplicate-event protection
 
-### Amazon S3
+## Amazon S3
 
 S3 Cross-Region Replication is used for required objects and operational artifacts.
 
 ---
 
-## 7. DNS Failover
+# 7. DNS Failover
 
-Amazon Route 53 is used as the DNS failover layer.
+Amazon Route 53 is the DNS failover layer.
 
-### Normal State
+## Normal State
 
 ```text
 Merchant
@@ -238,7 +255,7 @@ Mumbai ALB
 Mumbai EKS
 ```
 
-### Disaster State
+## Disaster State
 
 ```text
 Merchant
@@ -254,8 +271,6 @@ Hyderabad ALB
 Hyderabad EKS
 ```
 
-Route 53 health checks monitor the production endpoint and support controlled traffic redirection during regional failure.
-
 The repository contains:
 
 ```text
@@ -268,9 +283,9 @@ docs/04-dns-failover/
 
 ---
 
-## 8. Disaster Recovery Runbooks
+# 8. Disaster Recovery Runbooks
 
-Twelve production-oriented disaster scenarios are documented.
+The project contains 12 production-oriented DR scenarios.
 
 | ID    | Scenario                         |
 | ----- | -------------------------------- |
@@ -287,75 +302,199 @@ Twelve production-oriented disaster scenarios are documented.
 | RB-11 | Ransomware Attack                |
 | RB-12 | Cascading Microservice Failure   |
 
-Each runbook contains:
+Each runbook includes:
 
 * Detection criteria
 * Severity
 * Initial response
 * Decision points
-* AWS CLI / operational commands
-* Failover or containment procedure
+* Operational commands
+* Containment / failover procedure
 * Validation steps
-* Rollback / failback procedure
+* Rollback / failback
 * Communication requirements
 * Evidence collection
 * Post-incident actions
 
 ---
 
-## 9. Monitoring and Alert Thresholds
+# 9. Monitoring and Alerting
 
-Critical monitoring thresholds include:
+The project includes:
 
-| Metric                           | Threshold                        | Severity |
-| -------------------------------- | -------------------------------- | -------- |
-| Aurora Global DB Replication Lag | >500 ms for 2 checks             | P1       |
-| DynamoDB Replication Lag         | >1000 ms for 3 checks            | P1       |
-| Redis Global Datastore Lag       | >2000 ms for 3 checks            | P2       |
-| MSK Replicator Lag               | >10,000 messages for 5 min       | P2       |
-| Route 53 Health Check            | Any failure                      | P1       |
-| Payment API Success Rate         | <99.5% for 2 min                 | P1       |
-| Transaction P99 Latency          | >300 ms for 5 min                | P2       |
-| EKS Unready Nodes                | >2 for 3 min                     | P2       |
-| KMS Usage Anomaly                | >3× normal hourly volume         | P1       |
-| DR Composite Health              | Any critical component unhealthy | P1       |
+```text
+configs/monitoring/
+├── cloudwatch-alarms.yaml
+├── prometheus-rules.yaml
+└── grafana-dashboard.json
+```
 
-These thresholds provide measurable triggers for incident response and DR escalation.
+## Critical Thresholds
+
+| Metric                   | Threshold        | Severity |
+| ------------------------ | ---------------- | -------- |
+| Aurora Replication Lag   | >500 ms          | P1       |
+| DynamoDB Replication Lag | >1000 ms         | P1       |
+| Redis Replication Lag    | >2000 ms         | P2       |
+| MSK Replication Lag      | >10,000 messages | P2       |
+| Route 53 Health          | Failure          | P1       |
+| Payment Success Rate     | <99.5%           | P1       |
+| Transaction P99 Latency  | >300 ms          | P2       |
+| EKS Unready Nodes        | >2               | P2       |
+| KMS Usage Anomaly        | >3× normal       | P1       |
+| DR Composite Health      | Critical failure | P1       |
+
+Terraform CloudWatch alarm definitions are also included under:
+
+```text
+configs/terraform/monitoring/
+```
 
 ---
 
-## 10. Security Architecture
+# 10. Security Architecture
 
-The multi-region architecture applies security controls across both regions.
+Security controls are designed for both regions.
 
-Key controls include:
+### Encryption
 
-* AWS KMS encryption
-* Multi-region key strategy where required
-* TLS 1.3
-* mTLS for protected service communication
+* AWS KMS
+* Encryption at rest
+* TLS
+* Regional key strategy
+* KMS key rotation
+
+### Network Security
+
+* VPC segmentation
+* Private subnets
+* Database security groups
+* Kafka security groups
+* Application security groups
+* Restricted database access
+
+### Application / Edge Security
+
 * AWS WAF
 * AWS Shield
 * IAM least privilege
-* IAM drift detection
-* DNSSEC
+* mTLS for protected communication
+* DNSSEC design
 * Restricted Route 53 access
-* Network segmentation
-* PCI CDE isolation
-* CI/CD deployment guardrails
-* Security monitoring
-* Audit logging
-* Incident-response procedures
 
-Special attention is given to preventing security-control drift between Mumbai and Hyderabad.
+### Payment Security
+
+* PCI CDE segmentation
+* Audit logging
+* Security monitoring
+* Incident-response procedures
+* Security-control consistency across regions
 
 ---
 
-## 11. Data Sovereignty and Compliance
+# 11. Terraform Infrastructure
 
-The design keeps payment-system data processing and replicated production data within Indian AWS regions.
+The project includes Infrastructure as Code under:
 
-The repository contains compliance documentation covering:
+```text
+configs/terraform/
+```
+
+### Implemented areas
+
+```text
+configs/terraform/
+├── modules/
+│   ├── networking/
+│   ├── eks/
+│   ├── aurora/
+│   ├── dynamodb/
+│   ├── redis/
+│   ├── msk/
+│   └── route53/
+│
+├── security/
+│   ├── kms.tf
+│   └── security-groups.tf
+│
+├── replication/
+│   ├── aurora-global.tf
+│   ├── redis-global.tf
+│   ├── msk-replicator.tf
+│   └── s3-crr.tf
+│
+├── iam/
+│   └── replication-roles.tf
+│
+└── monitoring/
+    └── cloudwatch.tf
+```
+
+Terraform validation has been performed successfully during development.
+
+The configuration is designed with feature flags so infrastructure components can be selectively enabled.
+
+**Important:** This repository does not claim that production AWS infrastructure has been deployed. Terraform `apply` should only be performed after environment-specific credentials, networking, quotas, service availability, secrets and security approvals have been verified.
+
+---
+
+# 12. Kubernetes Deployment
+
+Kubernetes configurations are maintained under:
+
+```text
+configs/kubernetes/
+├── namespace.yaml
+├── configmap.yaml
+├── deployment-primary.yaml
+├── deployment-dr.yaml
+├── service.yaml
+├── hpa.yaml
+├── pdb.yaml
+└── ingress.yaml
+```
+
+The manifests provide:
+
+* Primary and DR deployments
+* Health checks
+* Resource requests and limits
+* Horizontal Pod Autoscaling
+* Pod Disruption Budget
+* ALB ingress
+* Security contexts
+* Regional configuration
+
+---
+
+# 13. DR Automation
+
+Operational scripts are provided under:
+
+```text
+scripts/
+├── failover/
+├── health-checks/
+└── dr-drill/
+```
+
+The automation includes:
+
+* DR health validation
+* RPO/RTO checks
+* Failover preparation
+* DR readiness validation
+* DR drill execution
+
+Scripts are designed to support controlled operations and avoid automatically performing destructive fault injection.
+
+---
+
+# 14. Data Sovereignty and Compliance
+
+The architecture keeps production payment processing and replicated production data within Indian AWS regions.
+
+Compliance documentation:
 
 ```text
 docs/07-data-sovereignty/
@@ -363,25 +502,23 @@ docs/07-data-sovereignty/
 └── data-flow-diagrams.md
 ```
 
-The mapping addresses the project requirements associated with:
+The assessment covers:
 
 * RBI payment-system requirements
-* RBI data-localization requirements
+* RBI data-localization considerations
 * PCI DSS v4.0
 * NPCI / UPI operational requirements
 * Encryption and key management
 * Replication controls
 * Evidence and auditability
 
-**Important:** The compliance documents are architecture-assessment mappings based on the project brief. Before production implementation, the applicable current regulatory text, contractual requirements and legal interpretation must be independently verified.
+**Compliance disclaimer:** These documents are architecture-assessment mappings for the project. Current regulatory text, contractual requirements and legal interpretation must be independently verified before production deployment.
 
 ---
 
-## 12. Cost Analysis
+# 15. Cost Analysis
 
-The project includes a planning-level DR cost model.
-
-### Annual Planning Estimates
+The repository includes a planning-level cost model.
 
 | DR Tier       | Estimated Annual Cost |
 | ------------- | --------------------: |
@@ -390,9 +527,11 @@ The project includes a planning-level DR cost model.
 | Hot Standby   |          ₹13.60 crore |
 | Active-Active |          ₹16.00 crore |
 
-The selected Hot Standby architecture is modeled at approximately **₹13.60 crore/year**.
+The selected Hot Standby architecture is modeled at approximately:
 
-The cost model includes:
+**₹13.60 crore/year**
+
+The model considers:
 
 * EKS / compute
 * Aurora PostgreSQL
@@ -409,9 +548,9 @@ The cost model includes:
 * CloudWatch
 * Prometheus / Grafana
 * PagerDuty / on-call
-* DR drills and operations
+* DR operations and drills
 
-See:
+Files:
 
 ```text
 docs/06-cost-analysis/
@@ -420,13 +559,13 @@ docs/06-cost-analysis/
 └── roi-analysis.md
 ```
 
+These are planning estimates rather than live AWS billing figures.
+
 ---
 
-## 13. DR Drill Program
+# 16. DR Drill Program
 
-The DR program uses quarterly exercises and an annual full business-continuity exercise.
-
-### Quarterly Plan
+The DR program uses quarterly exercises and an annual business-continuity exercise.
 
 | Quarter | Drill                    |
 | ------- | ------------------------ |
@@ -445,11 +584,11 @@ Each drill evaluates:
 * DNS failover
 * Security controls
 * Transaction reconciliation
-* Monitoring and alerting
+* Monitoring
 * Failback
 * Evidence collection
 
-The drill documentation is located at:
+Documentation:
 
 ```text
 docs/08-dr-drill-plan/
@@ -460,7 +599,7 @@ docs/08-dr-drill-plan/
 
 ---
 
-## 14. Repository Structure
+# 17. Repository Structure
 
 ```text
 doc-5b-multi-region-dr/
@@ -491,9 +630,9 @@ doc-5b-multi-region-dr/
 
 ---
 
-## 15. Documentation Deliverables
+# 18. Documentation Deliverables
 
-### Current-State Architecture
+## Current-State Architecture
 
 ```text
 docs/01-current-state/
@@ -502,7 +641,7 @@ docs/01-current-state/
 └── current-architecture.md
 ```
 
-### Multi-Region Design
+## Multi-Region Design
 
 ```text
 docs/02-multi-region-design/
@@ -515,7 +654,7 @@ docs/02-multi-region-design/
 └── comparison-matrix.md
 ```
 
-### Data Replication
+## Data Replication
 
 ```text
 docs/03-data-replication/
@@ -523,7 +662,7 @@ docs/03-data-replication/
 └── sequence-diagrams.md
 ```
 
-### DNS Failover
+## DNS Failover
 
 ```text
 docs/04-dns-failover/
@@ -533,7 +672,7 @@ docs/04-dns-failover/
 └── failover-timing-diagram.md
 ```
 
-### Disaster Runbooks
+## DR Runbooks
 
 ```text
 docs/05-runbooks/
@@ -553,43 +692,25 @@ docs/05-runbooks/
 
 ---
 
-## 16. Implementation Layer
+# 19. Validation Checklist
 
-The repository also reserves dedicated areas for infrastructure and operational automation:
-
-```text
-configs/terraform/
-configs/kubernetes/
-configs/monitoring/
-
-scripts/failover/
-scripts/health-checks/
-scripts/dr-drill/
-```
-
-These directories are intended for infrastructure-as-code, Kubernetes configuration, monitoring definitions and DR automation.
-
----
-
-## 17. Validation Checklist
-
-Before declaring the architecture production-ready, validate:
+Before production deployment, validate:
 
 * [ ] Both AWS regions are provisioned
 * [ ] EKS clusters are healthy
-* [ ] Aurora Global Database replication is healthy
+* [ ] Aurora replication is healthy
 * [ ] DynamoDB replication is validated
 * [ ] Redis replication is validated
 * [ ] MSK replication is validated
 * [ ] S3 replication is validated
 * [ ] Route 53 health checks are working
-* [ ] DNS failover has been tested
+* [ ] DNS failover is tested
 * [ ] Payment API health checks are working
 * [ ] Monitoring alerts are configured
 * [ ] P1/P2 escalation paths are tested
 * [ ] IAM permissions are validated
 * [ ] KMS configuration is validated
-* [ ] Security controls are consistent across regions
+* [ ] Security controls are consistent
 * [ ] Transaction reconciliation is tested
 * [ ] RPO < 1 minute is demonstrated
 * [ ] RTO < 5 minutes is demonstrated
@@ -599,28 +720,26 @@ Before declaring the architecture production-ready, validate:
 
 ---
 
-## 18. Key Engineering Principles
+# 20. Engineering Principles
 
-This project follows the following DR principles:
-
-1. **Minimize single-region dependency**
-2. **Automate detection wherever possible**
-3. **Keep recovery procedures measurable**
-4. **Protect transaction integrity during failover**
-5. **Prevent split-brain database operation**
-6. **Maintain consistent security controls across regions**
-7. **Treat DNS as a controlled failover mechanism**
-8. **Monitor replication continuously**
-9. **Validate recovery through regular drills**
-10. **Document every operational decision**
-11. **Maintain evidence for audit and review**
-12. **Design for controlled failback, not only failover**
+1. Minimize single-region dependency
+2. Automate failure detection where appropriate
+3. Keep recovery procedures measurable
+4. Protect transaction integrity during failover
+5. Prevent database split-brain
+6. Maintain security consistency across regions
+7. Use DNS as a controlled failover mechanism
+8. Monitor replication continuously
+9. Validate recovery through regular drills
+10. Document operational decisions
+11. Maintain audit evidence
+12. Design controlled failback as well as failover
 
 ---
 
-## 19. Project Outcome
+# 21. Project Outcome
 
-The resulting architecture provides PaySecure Gateway with a structured multi-region disaster recovery strategy covering:
+The project provides a structured multi-region Disaster Recovery design covering:
 
 * Current-state assessment
 * Multi-region architecture
@@ -629,27 +748,58 @@ The resulting architecture provides PaySecure Gateway with a structured multi-re
 * Data replication
 * DNS failover
 * Health monitoring
-* Disaster runbooks
+* Security controls
+* Terraform infrastructure
+* Kubernetes configuration
+* DR automation
+* 12 disaster-recovery runbooks
 * Cost modeling
 * Data sovereignty
-* Security controls
 * Compliance mapping
-* DR drills
+* DR drill planning
 * Recovery validation
 
-The architecture is designed around the project's target of **99.99% availability, RPO below one minute and RTO below five minutes**.
+The architecture is designed around the project targets of:
+
+**99.99% availability**
+**RPO < 1 minute**
+**RTO < 5 minutes**
 
 ---
 
-## 20. Disclaimer
+# 22. Project Status
 
-This repository is an **architecture and disaster-recovery engineering project** created for design, assessment and demonstration purposes.
-
-AWS service availability, pricing, quotas and implementation details may change. Regulatory and compliance mappings in this project should be validated against the applicable current RBI, NPCI, PCI DSS and other contractual/legal requirements before production deployment.
+| Area                       | Status     |
+| -------------------------- | ---------- |
+| Current-State Architecture | ✅ Complete |
+| Multi-Region Design        | ✅ Complete |
+| Active-Passive Design      | ✅ Complete |
+| Active-Active Evaluation   | ✅ Complete |
+| Data Replication Design    | ✅ Complete |
+| DNS Failover Design        | ✅ Complete |
+| 12 DR Runbooks             | ✅ Complete |
+| Cost Model                 | ✅ Complete |
+| Compliance Mapping         | ✅ Complete |
+| DR Drill Plan              | ✅ Complete |
+| Terraform Infrastructure   | ✅ Complete |
+| Kubernetes Configuration   | ✅ Complete |
+| Monitoring Configuration   | ✅ Complete |
+| DR Automation Scripts      | ✅ Complete |
+| Git Repository             | ✅ Updated  |
 
 ---
 
-## Author
+# 23. Disclaimer
+
+This repository is an **architecture, Infrastructure-as-Code and Disaster Recovery engineering project** created for design, assessment and demonstration purposes.
+
+AWS service availability, pricing, quotas and implementation details may change. Regulatory and compliance mappings should be validated against the applicable current RBI, NPCI, PCI DSS and contractual/legal requirements before production deployment.
+
+No production AWS deployment should be performed without appropriate credentials, security review, cost approval, service-availability validation and operational authorization.
+
+---
+
+# Author
 
 **Vanshika Khandelwal**
 
