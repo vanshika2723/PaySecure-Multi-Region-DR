@@ -1,0 +1,11 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: paysecure-gateway-pdb
+  namespace: paysecure
+spec:
+  minAvailable: 2
+
+  selector:
+    matchLabels:
+      app: paysecure-gateway

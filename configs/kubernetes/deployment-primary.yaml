@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paysecure-gateway-primary
+  namespace: paysecure
+  labels:
+    app: paysecure-gateway
+    region: primary
+spec:
+  replicas: 6
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 2
+
+  selector:
+    matchLabels:
+      app: paysecure-gateway
+      region: primary
+
+  template:
+    metadata:
+      labels:
+        app: paysecure-gateway
+        region: primary
+
+    spec:
+      terminationGracePeriodSeconds: 30
+
+      containers:
+        - name: paysecure-gateway
+          image: YOUR_ECR_REGISTRY/paysecure-gateway:latest
+
+          ports:
+            - name: http
+              containerPort: 8080
+
+          envFrom:
+            - configMapRef:
+                name: paysecure-config
+
+          env:
+            - name: DEPLOYMENT_REGION
+              value: "ap-south-1"
+
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL

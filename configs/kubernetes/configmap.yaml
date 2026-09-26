@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: paysecure-config
+  namespace: paysecure
+data:
+  APP_NAME: "paysecure-gateway"
+  APP_ENVIRONMENT: "production"
+  LOG_LEVEL: "info"
+
+  PRIMARY_REGION: "ap-south-1"
+  DR_REGION: "ap-south-2"
+
+  TARGET_RPO_SECONDS: "60"
+  TARGET_RTO_SECONDS: "300"
+
+  PAYMENT_API_TIMEOUT_MS: "300"
+  HEALTH_CHECK_PATH: "/health/ready"
+
+  KAFKA_SECURITY_PROTOCOL: "SASL_SSL"
+  DATABASE_SSL_MODE: "require"
