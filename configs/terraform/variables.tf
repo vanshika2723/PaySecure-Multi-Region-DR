@@ -251,3 +251,51 @@ variable "enable_dynamodb" {
   default     = false
 }
 
+variable "aurora_engine_version" {
+  description = "Aurora PostgreSQL engine version used by the Global Database."
+  type        = string
+  default     = "16.6"
+}
+
+variable "redis_engine_version" {
+  description = "Redis engine version."
+  type        = string
+  default     = "7.2"
+}
+
+variable "enable_aurora_global" {
+  description = "Enable Aurora Global Database integration."
+  type        = bool
+  default     = false
+}
+
+variable "enable_redis_global" {
+  description = "Enable Redis Global Datastore integration."
+  type        = bool
+  default     = false
+}
+
+variable "enable_msk_replicator" {
+  description = "Enable MSK Replicator."
+  type        = bool
+  default     = false
+}
+
+variable "enable_s3_crr" {
+  description = "Enable S3 Cross-Region Replication."
+  type        = bool
+  default     = false
+}
+
+variable "msk_replicator_role_arn" {
+  description = "IAM role ARN used by MSK Replicator."
+  type        = string
+  default     = ""
+}
+
+variable "s3_replication_role_arn" {
+  description = "IAM role ARN assumed by S3 replication."
+  type        = string
+  default     = ""
+}
+
