@@ -7,7 +7,7 @@ resource "aws_msk_replicator" "paysecure" {
 
   description = "PaySecure Mumbai to Hyderabad MSK replication"
 
-  service_execution_role_arn = var.msk_replicator_role_arn
+service_execution_role_arn = aws_iam_role.msk_replicator.arn
 
   kafka_cluster {
     amazon_msk_cluster {

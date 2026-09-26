@@ -60,7 +60,7 @@ resource "aws_s3_bucket_replication_configuration" "primary_to_dr" {
 
   bucket = aws_s3_bucket.primary_dr_artifacts[0].id
 
-  role = var.s3_replication_role_arn
+ role = aws_iam_role.s3_replication.arn
 
   rule {
     id     = "replicate-dr-artifacts"
