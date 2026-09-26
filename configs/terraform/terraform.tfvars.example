@@ -1,0 +1,123 @@
+
+# ============================================================
+# PaySecure Multi-Region DR Architecture
+# Example Terraform Variables
+# ============================================================
+
+project_name = "paysecure-dr"
+
+primary_region = "ap-south-1"
+dr_region      = "ap-south-2"
+
+environment = "production"
+
+# ------------------------------------------------------------
+# Networking
+# ------------------------------------------------------------
+
+vpc_cidr_primary = "10.10.0.0/16"
+vpc_cidr_dr      = "10.20.0.0/16"
+
+primary_availability_zones = [
+  "ap-south-1a",
+  "ap-south-1b",
+  "ap-south-1c"
+]
+
+dr_availability_zones = [
+  "ap-south-2a",
+  "ap-south-2b",
+  "ap-south-2c"
+]
+
+# ------------------------------------------------------------
+# EKS
+# ------------------------------------------------------------
+
+primary_eks_name = "paysecure-primary"
+dr_eks_name      = "paysecure-dr"
+
+eks_node_instance_type = "m6i.large"
+
+primary_eks_desired_nodes = 6
+dr_eks_desired_nodes      = 3
+
+# ------------------------------------------------------------
+# Aurora PostgreSQL
+# ------------------------------------------------------------
+
+aurora_engine         = "aurora-postgresql"
+aurora_database_name  = "paysecure"
+aurora_instance_class = "db.r6g.large"
+
+# Do NOT put real credentials here.
+# Use environment variables / AWS Secrets Manager.
+#
+# TF_VAR_aurora_master_username
+# TF_VAR_aurora_master_password
+
+# ------------------------------------------------------------
+# DynamoDB
+# ------------------------------------------------------------
+
+dynamodb_table_name = "paysecure-transactions"
+
+# ------------------------------------------------------------
+# Redis
+# ------------------------------------------------------------
+
+redis_node_type = "cache.r6g.large"
+
+# ------------------------------------------------------------
+# MSK / Kafka
+# ------------------------------------------------------------
+
+msk_kafka_version = "3.8.x"
+
+# ------------------------------------------------------------
+# Route 53
+# ------------------------------------------------------------
+
+enable_route53 = false
+
+# Fill these only after the hosted zone and ALB
+# infrastructure have been provisioned.
+
+route53_zone_id = ""
+
+route53_record_name = "api.paysecure.in"
+
+# ------------------------------------------------------------
+# Optional infrastructure switches
+# ------------------------------------------------------------
+
+enable_database = false
+enable_eks      = false
+enable_msk      = false
+enable_redis    = false
+enable_dynamodb = false
+```
+
+Save it here:
+
+```text
+configs/terraform/terraform.tfvars.example
+```
+
+### Step 2 — Git ignore
+
+Root `.gitignore` mein ye ensure karo:
+
+```gitignore
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfvars
+!terraform.tfvars.example
+
+# Terraform secrets
+*.tfvars.json
+

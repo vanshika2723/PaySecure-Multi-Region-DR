@@ -115,7 +115,9 @@ module "primary_aurora" {
   subnet_ids = module.primary_networking.database_subnet_ids
 
   # Security groups will be added during security-layer integration.
-  vpc_security_group_ids = []
+  vpc_security_group_ids = [
+  aws_security_group.primary_database.id
+]
 
   common_tags = local.common_tags
 }
@@ -142,7 +144,9 @@ module "dr_aurora" {
 
   subnet_ids = module.dr_networking.database_subnet_ids
 
-  vpc_security_group_ids = []
+ vpc_security_group_ids = [
+  aws_security_group.dr_database.id
+]
 
   common_tags = local.common_tags
 }
@@ -181,7 +185,9 @@ module "primary_redis" {
 
   subnet_ids = module.primary_networking.private_subnet_ids
 
-  security_group_ids = []
+ security_group_ids = [
+  aws_security_group.primary_application.id
+]
 
   common_tags = local.common_tags
 }
@@ -202,7 +208,9 @@ module "dr_redis" {
 
   subnet_ids = module.dr_networking.private_subnet_ids
 
-  security_group_ids = []
+  security_group_ids = [
+  aws_security_group.dr_application.id
+]
 
   common_tags = local.common_tags
 }
@@ -225,9 +233,11 @@ module "primary_msk" {
 
   subnet_ids = module.primary_networking.private_subnet_ids
 
-  security_group_ids = []
+  security_group_ids = [
+  aws_security_group.primary_kafka.id
+]
 
-  kms_key_arn = var.msk_kms_key_arn
+kms_key_arn = aws_kms_key.primary.arn
 
   common_tags = local.common_tags
 }
@@ -250,9 +260,11 @@ module "dr_msk" {
 
   subnet_ids = module.dr_networking.private_subnet_ids
 
-  security_group_ids = []
+  security_group_ids = [
+  aws_security_group.dr_kafka.id
+]
 
-  kms_key_arn = var.msk_kms_key_arn
+kms_key_arn = aws_kms_replica_key.dr.arn
 
   common_tags = local.common_tags
 }
